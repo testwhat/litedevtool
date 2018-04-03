@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="framework">
+    <loadproperties srcFile="build.properties" />
+    <import file="${tool.dir}/ant-lib/utils.xml" as="utils" />
+
+    <condition property="exe" value=".exe" else=""><os family="windows" /></condition>
+    <condition property="bat" value=".bat" else=""><os family="windows" /></condition>
+    <property name="build-script-location" value="${ant.file.framework}" />
+    <dirname file="${build-script-location}" property="working.dir" />
+    <property name="outdex" location="${working.dir}/${dexfile}" />
+
+    <target name="-find-aidl">
+        <fileset id="aidl-files" dir="${src}"><include name="**/*.aidl"/></fileset>
+        <pathconvert property="aidl-files-exist" refid="aidl-files" setonempty="false" />
+    </target>
+
+    <target name="aidl" depends="-find-aidl" if="aidl-files-exist">
+        <apply verbose="true" executable="${aidl}${exe}" parallel="false">
+            <arg value="-I${src}" />
+            <arg value="-p${framework.aidl}" />
+            <arg value="-o${gen}" />
+            <fileset refid="aidl-files" />
+        </apply>
+    </target>
+
+    <target name="compile-by-javac" unless="${useJack}">
+        <loadproperties srcFile="classpath.properties" />
+        <path id="bootclasspath">
+            <fileset dir="${working.dir}/${fwclasspath}" includes="${bootlibs}" />
+        </path>
+        <path id="classpath">
+            <fileset dir="${fwclasspath}" includes="${libs}" />
+        </path>
+
+        <mkdir dir="${bin}" />
+        <javac executable="${javac}${bat}"
+            srcdir="${src}:${gen}" destdir="${bin}"
+            debug="true" debuglevel="lines,vars,source"
+            bootclasspathref="bootclasspath"
+            classpathref="classpath"
+            fork="true" source="${java.source}" target="${java.target}"
+            encoding="${encoding}" verbose="${verbose}"
+            includeantruntime="false" />
+    </target>
+
+    <target name="compile-by-jack" if="${useJack}">
+        <fileset id="java-fileset" dir="${basedir}">
+            <include name="${src}/**/*.java" />
+            <include name="${gen}/**/*.java" />
+        </fileset>
+        <pathconvert pathsep="${line.separator}" property="java-source-files" refid="java-fileset" />
+        <echo file="java-files.txt">${java-source-files}</echo>
+        <property name="java-files" location="java-files.txt"/>
+
+        <loadproperties srcFile="classpath.properties" />
+        <replacestring input="${bootlibs}" output="jack-bootlibs" from="\.jar" to="\.jack" />
+        <replacestring input="${libs}" output="jack-libs" from="\.jar" to="\.jack" />
+        <property name="jack-active-libs" value="${jack-bootlibs},${extlibs},${jack-libs}" />
+        <path id="jack-classpath"><fileset dir="framework-jacks" includes="${jack-active-libs}" /></path>
+        <pathconvert property="jack-classpath" refid="jack-classpath" />
+        <fail message="jack-classpath is empty">
+            <condition><equals arg1="${jack-classpath}" arg2="" /></condition>
+        </fail>
+
+        <exec executable="${jack}${bat}">
+            <arg value="@${java-files}" />
+            <arg value="-D" />
+            <arg value="jack.java.source.version=${java.source}" />
+            <arg value="-D" />
+            <arg value="jack.android.min-api-level=${api.level}" />
+            <arg value="-D" />
+            <arg value="jack.dex.debug.vars=true" />
+            <arg value="--output-dex" />
+            <arg value="${basedir}" />
+            <arg value="-cp" />
+            <arg value="${jack-classpath}" />
+            <arg value="--sanity-checks" />
+            <arg value="off" />
+            <arg value="--verbose" />
+            <arg value="ERROR" />
+        </exec>
+    </target>
+
+    <target name="compile" depends="compile-by-javac, compile-by-jack" />
+
+    <target name="dex" unless="${useJack}"><!-- no need when using jack -->
+        <exec executable="${dx}${bat}">
+            <arg value="--dex" />
+            <arg value="--no-strict" />
+            <arg value="--core-library" />
+            <arg value="--output=${outdex}" />
+            <arg value="${basedir}/${bin}" />
+        </exec>
+    </target>
+
+    <target name="build" depends="aidl, compile" />
+    <target name="buildex" depends="build, dex" />
+    <target name="buildex-skip-aidl" depends="compile, dex" />
+
+    <target name="clean">
+        <delete includeEmptyDirs="true" failonerror="false">
+            <fileset dir="${bin}" includes="**/*" />
+            <fileset dir="${gen}" includes="**/*" />
+        </delete>
+        <echo message="Cleaned ${bin}, ${gen}" />
+        <delete file="${outdex}" />
+    </target>
+</project>

@@ -1,0 +1,6 @@
+[submodule "smaliex"]
+	path = smaliex
+	url = https://github.com/testwhat/SmaliEx
+[submodule "android-tools"]
+	path = android-tools
+	url = https://github.com/testwhat/android-tools

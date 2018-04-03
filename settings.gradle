@@ -1,0 +1,7 @@
+apply from: 'smaliex/settings.gradle'
+
+rootProject.children.each { prj ->
+    prj.projectDir = new File(rootDir, "smaliex/$prj.name")
+}
+
+include 'lite-dev-tool'

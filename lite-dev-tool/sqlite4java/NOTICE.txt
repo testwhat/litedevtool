@@ -1,0 +1,2 @@
+https://d1.almworks.com/.files/sqlite4java/sqlite4java-392.zip
+https://bitbucket.org/almworks/sqlite4java/src/master/README.md

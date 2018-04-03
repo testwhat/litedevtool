@@ -1,0 +1,11 @@
+*.iml
+*.ipr
+*.iws
+ldt.properties
+.idea
+.gradle
+lite-dev-tool-bin
+classes
+localtest
+build
+out

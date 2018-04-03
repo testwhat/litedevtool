@@ -1,0 +1,1 @@
+start javaw -Xmx768m -cp %~dp0\litedevtool.jar org.rh.ldt.ui.MainUi

@@ -1,0 +1,110 @@
+import proguard.gradle.ProGuardTask
+
+def mainClass = "org.rh.ldt.ui.MainUi"
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath depends.proguard_gradle
+    }
+}
+
+assert JavaVersion.current().isJava8Compatible()
+
+dependencies {
+    compile files('./sqlite4java/sqlite4java.jar')
+    compile project(':smaliex')
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+}
+
+// Build a separate jar that contains all dependencies
+task fatJar(type: Jar, dependsOn: jar) {
+    from sourceSets.main.output
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+
+    manifest {
+        attributes 'Main-Class': mainClass
+    }
+}
+tasks.getByPath('build').dependsOn(fatJar)
+
+task proguard(type: ProGuardTask, dependsOn: fatJar) {
+    def outName = fatJar.baseName + '-small.' + fatJar.extension;
+    def outFile = fatJar.destinationDir.getPath() + '/' + outName
+    project.ext.set('outName', outName)
+    project.ext.set('outFile', outFile)
+
+    injars fatJar.archivePath, filter: '!javax/**/*.java'
+    outjars outFile
+
+    libraryjars "${System.properties['java.home']}/lib/rt.jar"
+
+    dontobfuscate
+    dontoptimize
+    keepattributes '*Annotation*'
+    keepattributes 'Signature'
+    //keep "public class ${mainClass} { public static void main(java.lang.String[]); }"
+    keep "public class * { public static void main(java.lang.String[]); }"
+    keepclassmembers 'enum * { public static **[] values(); public static ** valueOf(java.lang.String); }'
+    dontwarn 'com.google.common.**'
+    dontnote 'com.google.common.**'
+}
+
+task proguardReplacer(type: ProGuardTask, dependsOn: proguard) {
+    def outFile = fatJar.destinationDir.getPath() + '/dexreplacer_tmp.jar'
+    mainClass = "org.rh.ldt.DexReplacer"
+    project.ext.set('replacerTmp', outFile)
+    injars project.outFile
+    outjars outFile
+    libraryjars "${System.properties['java.home']}/lib/rt.jar"
+    dontwarn '**'
+    keepclassmembers 'enum * { public static **[] values(); public static ** valueOf(java.lang.String); }'
+    keep "public class ${mainClass} { public static void main(java.lang.String[]); }"
+}
+
+task replacer(type: Jar, dependsOn: proguardReplacer) {
+    from zipTree(project.replacerTmp).matching {
+        include '**/*.class'
+    }
+    manifest {
+        attributes 'Main-Class': mainClass
+    }
+    archiveName 'dexreplacer.jar'
+}
+
+def binPath = '../lite-dev-tool-bin'
+
+task dist(dependsOn: proguard) {
+    //doLast {
+    //    def dist = file("$binPath/litedevtool.jar")
+    //    dist.delete()
+    //    file(project.outFile).renameTo(dist)
+    //}
+}
+
+task distZip(type: Zip, dependsOn: dist) {
+    from (project.outFile).rename(project.outName.toString(), 'litedevtool.jar')
+    from ('./sqlite4java/') {
+        include '*.dll'
+        include '*.so'
+        include '*.jar'
+    }
+    from ('./script/') {
+        include '*.sh'
+        include '*.bat'
+    }
+    from ('../android-tools') {
+        include 'ant/', 'ant-lib/', 'apt/', 'compiler/', 'dex2jar/'
+        exclude 'compiler/d8', 'compiler/ecj'
+        into 'tools'
+    }
+    archiveName = 'lite-dev-tool.zip'
+    destinationDir = file(binPath)
+}
