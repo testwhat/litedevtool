@@ -196,18 +196,31 @@ public class Env {
         return get(Env.PROP_WORKSPACE, DEFAULT_WORKSPACE);
     }
 
+    private static boolean isEnvExecutable(String exec) {
+        final String[] res = new String[1];
+        exec("which " + exec, s -> res[0] = s);
+        return res[0] != null;
+    }
+
     public static void openPcFileBrowser(String path, boolean select) {
         try {
-            String command;
+            final String command;
             if (Env.IS_WINDOWS) {
-                command = "explorer.exe " + (select ? "/select, " : "") + path;
+                command = "explorer.exe " + (select ? "/select, " : "");
             } else {
-                //xdg-open
-                command = "gnome-open " + path;
+                if (isEnvExecutable("xdg-open")) {
+                    command = "xdg-open";
+                } else if (isEnvExecutable("nemo")) {
+                    command = "nemo";
+                } else if (isEnvExecutable("nautilus")) {
+                    command = "nautilus";
+                } else {
+                    command = "gnome-open";
+                }
             }
-            Runtime.getRuntime().exec(command);
-        } catch (Exception e1) {
-            DLog.ex(e1);
+            Runtime.getRuntime().exec(command + " " + path);
+        } catch (Exception e) {
+            DLog.ex(e);
         }
     }
 

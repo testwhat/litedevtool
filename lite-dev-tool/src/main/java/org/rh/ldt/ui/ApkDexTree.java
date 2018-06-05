@@ -63,7 +63,7 @@ class ApkDexTree extends Droppable.TreeView {
         void onOpenSmali(final OpenData data);
     }
 
-    ApkDexTree() {
+    private ApkDexTree() {
         setRootVisible(false);
         setScrollsOnExpand(false);
 
@@ -190,7 +190,7 @@ class ApkDexTree extends Droppable.TreeView {
         });
     }
 
-    static DefaultMutableTreeNode getClassesTree(File f, DexBackedDexFile df, int i) {
+    private static DefaultMutableTreeNode getClassesTree(File f, DexBackedDexFile df, int i) {
         TreeMap<String, ArrayList<NodeClass>> allClasses = new TreeMap<>();
         ArrayList<NodeClass> noPkgClasses = null;
         for (DexBackedClassDef c : df.getClasses()) {

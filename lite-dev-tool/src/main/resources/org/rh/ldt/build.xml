@@ -4,7 +4,7 @@
     <import file="${tool.dir}/ant-lib/utils.xml" as="utils" />
 
     <condition property="exe" value=".exe" else=""><os family="windows" /></condition>
-    <condition property="bat" value=".bat" else=""><os family="windows" /></condition>
+    <condition property="bat" value=".bat" else=".sh"><os family="windows" /></condition>
     <property name="build-script-location" value="${ant.file.framework}" />
     <dirname file="${build-script-location}" property="working.dir" />
     <property name="outdex" location="${working.dir}/${dexfile}" />

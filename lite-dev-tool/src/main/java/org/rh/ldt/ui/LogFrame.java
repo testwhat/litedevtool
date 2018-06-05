@@ -67,23 +67,24 @@ public class LogFrame extends JFrame {
     private UpdatePaneTaskUtil mTextUpdater;
     private int mFilterLen = 2;
     private JCheckBox mAutoScrollCB;
-    private JRadioButton[] mLogLevelRadioBtns;
     private Timer mControlTimer = UiUtil.getTaskTimer();
     private Highlighter.HighlightPainter mHlPainter =
             new DefaultHighlighter.DefaultHighlightPainter(Color.YELLOW);
     private boolean mPause;
     private boolean mRestart;
+    private boolean mDropStartingLog;
+    private long mLastStartTime;
     private LogAttr.LogSource mLogSource = LogAttr.LogSource.defaults;
     private Log.LogLevel mLevel = Log.LogLevel.VERBOSE;
     private CommandReceiverTask mLogTask;
 
-    public LogFrame(String title) throws HeadlessException {
+    LogFrame(String title) throws HeadlessException {
         setTitle(title);
         setLocationByPlatform(true);
-        JPanel baseP = new JPanel(new BorderLayout());
-        Box controlPanel = new Box(BoxLayout.Y_AXIS);
-        controlPanel.add(newControlFirstLine());
-        controlPanel.add(newControlSecondLine());
+        final JPanel baseP = new JPanel(new BorderLayout());
+        final Box controlPanel = new Box(BoxLayout.Y_AXIS);
+        controlPanel.add(createControlFirstRow());
+        controlPanel.add(createControlSecondRow());
         baseP.add(controlPanel, BorderLayout.NORTH);
         baseP.add(new JScrollPane(mLogPane), BorderLayout.CENTER);
         setContentPane(baseP);
@@ -99,22 +100,21 @@ public class LogFrame extends JFrame {
         });
     }
 
-    void startLogTask() {
-        new Thread() {
-            @Override
-            public void run() {
-                mLogTask.run();
-                if (mRestart) {
-                    mRestart = false;
-                    mLogTask.setCancelled(false);
-                    startLogTask();
-                }
+    private void startLogTask() {
+        new Thread(() -> {
+            mDropStartingLog = true;
+            mLastStartTime = System.currentTimeMillis();
+            mLogTask.run(); // Loop to read log.
+            if (mRestart) {
+                mRestart = false;
+                mLogTask.setCancelled(false);
+                startLogTask();
             }
-        }.start();
+        }).start();
     }
 
     public void start(Device device, LogAttr.LogSource logSrc) {
-        CommandReceiverTask.Logger t = new CommandReceiverTask.Logger() {
+        final CommandReceiverTask.Logger t = new CommandReceiverTask.Logger() {
             @Override
             public void onLog(String[] logs) {
                 for (String log : logs) {
@@ -138,14 +138,14 @@ public class LogFrame extends JFrame {
         setVisible(true);
     }
 
-    public void restart() {
+    private void restart() {
         mLogPane.setText("");
         mRestart = true;
         mLogTask.stop();
     }
 
     private static Log.LogLevel getLogLevel(char c) {
-        Log.LogLevel lv = Log.LogLevel.getByLetter(c);
+        final Log.LogLevel lv = Log.LogLevel.getByLetter(c);
         return lv != null ? lv : Log.LogLevel.ERROR;
     }
 
@@ -156,11 +156,11 @@ public class LogFrame extends JFrame {
                 return false;
             }
         }
-        String ex = mExcludeTF.getCurrentLowerCaseStr();
-        String in = mIncludeTF.getCurrentLowerCaseStr();
-        boolean normalExclude = ex.length() > mFilterLen && !mExcludeTF.isRegExpMode();
-        boolean normalInclude = in.length() > mFilterLen && !mIncludeTF.isRegExpMode();
-        String msg = (normalExclude || normalInclude) ? log.toLowerCase() : "";
+        final String ex = mExcludeTF.getCurrentLowerCaseStr();
+        final String in = mIncludeTF.getCurrentLowerCaseStr();
+        final boolean normalExclude = ex.length() > mFilterLen && !mExcludeTF.isRegExpMode();
+        final boolean normalInclude = in.length() > mFilterLen && !mIncludeTF.isRegExpMode();
+        final String msg = (normalExclude || normalInclude) ? log.toLowerCase() : "";
         if (normalExclude) {
             if (msg.contains(ex)) {
                 return false;
@@ -175,10 +175,12 @@ public class LogFrame extends JFrame {
         } else if (mIncludeTF.isRegExpMode()) {
             return mIncludeTF.match(log);
         }
-        return true;
+
+        return !mDropStartingLog
+                || (mDropStartingLog = System.currentTimeMillis() - mLastStartTime < 500);
     }
 
-    void appendLine(String log) {
+    private void appendLine(String log) {
         int start = -1, end = -1;
         if (mHighlightTF.getLength() > mFilterLen) {
             String hl = mHighlightTF.getCurrentLowerCaseStr();
@@ -202,7 +204,7 @@ public class LogFrame extends JFrame {
 
         private boolean mIsAutoScroll = true;
 
-        public LoggerPane() {
+        LoggerPane() {
             setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
             setLineWrap(true);
         }
@@ -219,7 +221,7 @@ public class LogFrame extends JFrame {
             }
         }
 
-        public void setAutoScroll(boolean isAuto) {
+        void setAutoScroll(boolean isAuto) {
             mIsAutoScroll = isAuto;
         }
 
@@ -231,8 +233,8 @@ public class LogFrame extends JFrame {
         }
     }
 
-    private Box newControlFirstLine() {
-        Box control1 = new Box(BoxLayout.X_AXIS);
+    private Box createControlFirstRow() {
+        final Box control1 = new Box(BoxLayout.X_AXIS);
         control1.add(Box.createHorizontalStrut(10));
 
         control1.add(new JLabel("Highlight: "));
@@ -241,11 +243,11 @@ public class LogFrame extends JFrame {
         control1.add((newClearTextButton(mHighlightTF)));
         control1.add(Box.createHorizontalStrut(10));
 
-        Log.LogLevel[] levels = Log.LogLevel.values();
+        final Log.LogLevel[] levels = Log.LogLevel.values();
         final int levelSize = levels.length - 1;
-        ButtonGroup levelGroup = new ButtonGroup();
-        mLogLevelRadioBtns = new JRadioButton[levelSize];
-        for (int i = 0; i < mLogLevelRadioBtns.length; i++) {
+        final ButtonGroup levelGroup = new ButtonGroup();
+        final JRadioButton[] logLevelRadioButtons = new JRadioButton[levelSize];
+        for (int i = 0; i < logLevelRadioButtons.length; i++) {
             Log.LogLevel level = levels[i];
             JRadioButton rb = new JRadioButton(level.getPriorityLetter() + "  ");
             Color color = LogAttr.getLogLevelColor(level);
@@ -254,15 +256,15 @@ public class LogFrame extends JFrame {
             rb.setBorderPainted(true);
             rb.addActionListener(mLevelChangeAction);
             rb.setBorder(BorderFactory.createEtchedBorder());
-            levelGroup.add(mLogLevelRadioBtns[i] = rb);
+            levelGroup.add(logLevelRadioButtons[i] = rb);
         }
-        mLogLevelRadioBtns[0].setSelected(true);
+        logLevelRadioButtons[0].setSelected(true);
 
-        JPanel logLevelPanel = new JPanel(new GridBagLayout());
-        GridBagConstraints gBC = new GridBagConstraints();
+        final JPanel logLevelPanel = new JPanel(new GridBagLayout());
+        final GridBagConstraints gBC = new GridBagConstraints();
         gBC.fill = GridBagConstraints.BOTH;
         for (gBC.gridx = 0; gBC.gridx < levelSize; gBC.gridx++) {
-            logLevelPanel.add(mLogLevelRadioBtns[gBC.gridx], gBC);
+            logLevelPanel.add(logLevelRadioButtons[gBC.gridx], gBC);
         }
 
         mAutoScrollCB = new JCheckBox("Auto Scroll");
@@ -273,7 +275,7 @@ public class LogFrame extends JFrame {
         logLevelPanel.add(mAutoScrollCB);
         control1.add(logLevelPanel);
 
-        JButton clear = new JButton("Clear");
+        final JButton clear = new JButton("Clear");
         clear.addActionListener(e -> mLogPane.setText(""));
         control1.add(clear);
 
@@ -293,8 +295,8 @@ public class LogFrame extends JFrame {
         return control1;
     }
 
-    private Box newControlSecondLine() {
-        Box control2 = new Box(BoxLayout.X_AXIS);
+    private Box createControlSecondRow() {
+        final Box control2 = new Box(BoxLayout.X_AXIS);
         control2.add(Box.createHorizontalStrut(10));
 
         setTextFieldOnChange(mIncludeTF = new JFilterTextField(20, mFilterLen, true));
@@ -311,8 +313,8 @@ public class LogFrame extends JFrame {
         return control2;
     }
 
-    JButton newClearTextButton(final JTextField tf) {
-        JButton btn = new JButton("X");
+    private JButton newClearTextButton(final JTextField tf) {
+        final JButton btn = new JButton("X");
         Border margin = new EmptyBorder(5, 10, 5, 10);
         btn.setBorder(margin);
         btn.addActionListener(e -> {
@@ -334,7 +336,7 @@ public class LogFrame extends JFrame {
         }
     };
 
-    JFilterTextField.TimerTaskCreator mRefreshAction = () -> new TimerTask() {
+    private JFilterTextField.TimerTaskCreator mRefreshAction = () -> new TimerTask() {
         @Override
         public void run() {
             restart();
@@ -404,7 +406,7 @@ public class LogFrame extends JFrame {
                 if (remain == 0 && !mBusyBuf.isEmpty()) {
                     //System.out.println("b " + mBusyBuf.size());
                     for (int i = 0, s = mBusyBuf.size(); i < s; i++) {
-                        mViewer.appendLine(mBusyBuf.get(i));
+                    //    mViewer.appendLine(mBusyBuf.get(i));
                     }
                     mBusyBuf.clear();
                 }
@@ -424,7 +426,7 @@ public class LogFrame extends JFrame {
         private void appendLogLine(String l) {
             UpdatePaneTask t = pick();
             t.mLine = l;
-            int remain = mEventCount.get();
+            final int remain = mEventCount.get();
             if (remain > BUSY_THRESHOLD) {
                 mBusyBuf.add(l);
             } else {
@@ -443,7 +445,6 @@ class LogAttr {
         main("main", "-b main", true),
         events("events", "-b events", false),
         kernel("kernel", "", false),
-        klogcat("klogcat", "", false),
         radio("radio", "-b radio", true),
         crash("crash", "-b crash", true),
         system_events("system & event", "-b system -b events", true),
@@ -463,8 +464,6 @@ class LogAttr {
         public String getCommand() {
             if (this == kernel) {
                 return " cat /proc/kmsg ";
-            } else if (this == klogcat) {
-                return " klogcat ";
             }
             return " logcat " + cmd + " -v threadtime";
         }
@@ -482,8 +481,8 @@ class LogAttr {
         }
     }
 
-    final static Color COLOR_GREEN = new Color(0, 150, 0);
-    final static Color COLOR_ORANGE = new Color(230, 140, 0);
+    private final static Color COLOR_GREEN = new Color(0, 150, 0);
+    private final static Color COLOR_ORANGE = new Color(230, 140, 0);
 
     public static Color getLogLevelColor(Log.LogLevel level) {
         switch (level) {

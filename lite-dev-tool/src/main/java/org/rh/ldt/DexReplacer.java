@@ -272,7 +272,7 @@ public class DexReplacer {
         public DexBackedClassReplacer(@Nonnull List<DexBackedDexFile> srcDexFiles,
                 @Nonnull List<DexBackedDexFile> replacerDexFiles,
                 @Nullable java.util.Collection<String> targetSourceNames) {
-            opcode = srcDexFiles.isEmpty() ? DexUtilEx.getDefaultOpCodes()
+            opcode = srcDexFiles.isEmpty() ? replacerDexFiles.get(0).getOpcodes()
                     : srcDexFiles.get(0).getOpcodes();
             for (DexBackedDexFile d : srcDexFiles) {
                 mSrcClasses.addAll(d.getClasses());

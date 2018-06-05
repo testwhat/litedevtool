@@ -91,9 +91,9 @@ public class ProjectPanel extends JPanel {
         }
     }
 
-    final PathMonitor mPathMonitor = new PathMonitor();
-    final ConcurrentHashMap<Device, ProjectItem> mProjectByDevice = new ConcurrentHashMap<>();
-    final ConcurrentHashMap<String, ProjectItem> mProjectByName = new ConcurrentHashMap<>();
+    private final PathMonitor mPathMonitor = new PathMonitor();
+    private final ConcurrentHashMap<Device, ProjectItem> mProjectByDevice = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ProjectItem> mProjectByName = new ConcurrentHashMap<>();
 
     private ProjectPanel() {
         File[] cds = new File(Env.getWorkspace()).listFiles(File::isDirectory);
@@ -152,7 +152,7 @@ public class ProjectPanel extends JPanel {
         monitorWorkspace();
     }
 
-    void addProject(Properties prop, ProjectItem pi, boolean top, boolean refresh) {
+    private void addProject(Properties prop, ProjectItem pi, boolean top, boolean refresh) {
         ProjectItem p = pi == null ? new ProjectItem(new Project(prop)) : pi;
         if (mProjectByName.get(p.project.name) == null) {
             mProjectByName.put(p.project.name, p);
@@ -166,11 +166,11 @@ public class ProjectPanel extends JPanel {
         }
     }
 
-    void addProject(Properties prop, ProjectItem pi, boolean top) {
+    private void addProject(Properties prop, ProjectItem pi, boolean top) {
         addProject(prop, pi, top, true);
     }
 
-    void addProject(Device device) {
+    private void addProject(Device device) {
         SwingUtilities.invokeLater(() -> {
             final String name = Project.device2Name(device);
             ProjectItem p = mProjectByName.get(name);
@@ -204,7 +204,7 @@ public class ProjectPanel extends JPanel {
         });
     }
 
-    void removeProject(final Device device, final String name) {
+    private void removeProject(final Device device, final String name) {
         SwingUtilities.invokeLater(() -> {
             boolean byDevice = device != null;
             ProjectItem p = byDevice ?
@@ -302,7 +302,7 @@ public class ProjectPanel extends JPanel {
         final Project mProject;
         final ButtonPanel mBtnPanel;
 
-        public DevicePanel(final Project project) {
+        DevicePanel(final Project project) {
             super(new BorderLayout());
             mProject = project;
             mBtnPanel = new ButtonPanel(project);
@@ -324,7 +324,7 @@ public class ProjectPanel extends JPanel {
                     + "[ Drop source file/folder to auto build ]</p></html>");
             enableBuild.setHorizontalTextPosition(SwingConstants.LEFT);
             enableBuild.setToolTipText("Unchecked will only copy source");
-            enableBuild.setMaximumSize(new Dimension(240, 20));
+            enableBuild.setMaximumSize(new Dimension(260, 20));
             enableBuild.setSelected(true); // TODO save enableBuild to prop
 
             Droppable.Panel infoPanel = new Droppable.Panel() {
@@ -376,7 +376,8 @@ public class ProjectPanel extends JPanel {
         static class AppProjectButton extends JToggleButton {
             static Icon COLLAPSED = UIManager.getIcon("Tree.collapsedIcon");
             static Icon EXPANDED = javax.swing.UIManager.getIcon("Tree.expandedIcon");
-            public AppProjectButton() {
+
+            AppProjectButton() {
                 super(COLLAPSED);
                 setIconTextGap(getIconTextGap() - 10);
                 setText("App projects");
@@ -492,7 +493,7 @@ public class ProjectPanel extends JPanel {
         }
 
         static class BtnProject extends MenuButton {
-            public BtnProject(Project p) {
+            BtnProject(Project p) {
                 super("Project", p, Project.STATUS_ONLINE | Project.STATUS_INITIALIZED);
                 addMenuItem("init", event -> {
                     if (mProject.folder.isDirectory()) {
@@ -531,7 +532,7 @@ public class ProjectPanel extends JPanel {
 
         static class BtnBuild extends MenuButton {
 
-            public BtnBuild(Project p) {
+            BtnBuild(Project p) {
                 super("Build", p, Project.STATUS_INITIALIZED, true);
                 addMenuItem("all jars", event -> {
                     if (mProject.buildSrcToDex()) {
@@ -551,7 +552,7 @@ public class ProjectPanel extends JPanel {
         }
 
         static class BtnPush extends MenuButton {
-            public BtnPush(Project p) {
+            BtnPush(Project p) {
                 super("Push", p, Project.STATUS_ONLINE);
             }
 
@@ -608,7 +609,7 @@ public class ProjectPanel extends JPanel {
         }
 
         static class BtnReboot extends MenuButton {
-            public BtnReboot(Project p) {
+            BtnReboot(Project p) {
                 super("Reboot", p, Project.STATUS_ONLINE, true);
                 addMenuItem("Quick",
                         event -> AdbUtilEx.shell(mProject.getDevice(), "stop;start"));
@@ -618,10 +619,6 @@ public class ProjectPanel extends JPanel {
                         event -> AdbUtilEx.rebootToBootloader(mProject.getDevice()));
                 addMenuItem("downloadmode",
                         event -> AdbUtilEx.reboot(mProject.getDevice(), "download"));
-                addMenuItem("ruu (rom update)",
-                        event -> AdbUtilEx.reboot(mProject.getDevice(), "oem-78"));
-                addMenuItem("ftm (factory test)",
-                        event -> AdbUtilEx.reboot(mProject.getDevice(), "ftm"));
                 addMenuItem("disable-verity",
                         event -> {
                             String ret = AdbUtilEx.shell(mProject.getDevice(), "disable-verity");
@@ -635,7 +632,7 @@ public class ProjectPanel extends JPanel {
         }
 
         static class BtnLogcat extends MenuButton {
-            public BtnLogcat(Project p) {
+            BtnLogcat(Project p) {
                 super("Logcat", p, Project.STATUS_ONLINE);
                 for (LogAttr.LogSource logSrc : LogAttr.LogSource.values()) {
                     addMenuItem(logSrc.name, event -> new LogFrame(mProject.name
@@ -654,8 +651,9 @@ public class ProjectPanel extends JPanel {
             // dalvik.vm.dex2oat-thread_count
             // dalvik.vm.dex2oat-threads
             // dalvik.vm.image-dex2oat-threads
-            public BtnDevice(Project p) {
+            BtnDevice(Project p) {
                 super("Device", p, Project.STATUS_ONLINE);
+                addMenuItem("Refresh adb", event -> AdbUtilEx.startAdb(null));
                 addMenuItem("Screen control", event -> {
                     ScreenController c = new ScreenController(mProject.getDevice());
                     c.show();

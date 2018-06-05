@@ -78,8 +78,7 @@ public class DexDb implements java.io.Closeable {
         if (stmt.step()) {
             jarFileId = stmt.columnInt(0) + 1;
         }
-        final Opcodes opcodes = mApiLevel > 0 ? DexUtil.getOpcodes(mApiLevel)
-                : DexUtilEx.getDefaultOpCodes();
+        final Opcodes opcodes = mApiLevel > 0 ? DexUtil.getOpcodes(mApiLevel) : null;
         for (File f : dexFiles) {
             if (!f.exists()) {
                 DLog.i("addClassesToDb: " + f + " does not exist");
@@ -97,7 +96,7 @@ public class DexDb implements java.io.Closeable {
                             && fileSize > 40) {
                         insertJar(jarFileId, f.getName(), name);
                         DexBackedDexFile df = new DexBackedDexFile(opcodes,
-                                FileUtil.readBytes(zipFile.getInputStream(entry)));
+                                FileUtil.readBytes(zipFile.getInputStream(entry)), 0);
                         processDex(df, jarFileId);
                         jarFileId++;
                     }

@@ -46,7 +46,7 @@ public class Project {
     public static final String TOOL_PATH = Env.getToolPath();
     public static final String ANT = TOOL_PATH + "/ant/bin/ant" + EXEC_BAT;
     public static final String DEX2JAR = TOOL_PATH + "/dex2jar/d2j-dex2jar-ex-oc" + EXEC_EXT;
-    public static final String JAR2JACK = TOOL_PATH + "/jack/jill" + EXEC_EXT;
+    public static final String JAR2JACK = TOOL_PATH + "/compiler/jack/jill" + EXEC_EXT;
     public static final String HIDL_JAR = "hardware-hidl-%d.jar";
     public static final String HIDL_PATH = TOOL_PATH + "/apt/hidl/" + HIDL_JAR;
 
@@ -109,7 +109,6 @@ public class Project {
             mDevice = device;
             mStatus = STATUS_ONLINE;
             name = device2Name(device);
-            folder = new File(Env.getWorkspace(), name.replace(" ", "_"));
             apiLevel = StringUtil.toInt(device.getProperty(Device.PROP_BUILD_API_LEVEL));
             useJack = apiLevel >= API_LEVEL_N;
             if (!useJack) {
@@ -119,17 +118,17 @@ public class Project {
                     useJack = true;
                 }
             }
-            String tags = device.getProperty("ro.build.tags");
-            String type = device.getProperty("ro.build.type");
+            final String tags = device.getProperty("ro.build.tags");
+            final String type = device.getProperty("ro.build.type");
             buildInfo = "tags:" + tags + " type:" + type;
             bcp = getBootJars(device);
             scp = getServerJars(device);
         } else {
             name = prop.getProperty(PROP_NAME);
-            folder = new File(Env.getWorkspace(), name);
             buildInfo = prop.getProperty(PROP_BUILD_INFO);
             load(prop);
         }
+        folder = new File(Env.getWorkspace(), name.replace(" ", "_"));
 
         dexJarsFolder = new File(folder, FW_DEX_JARS_FOLDER);
         libsFolder = new File(folder, FW_CLASS_JARS_FOLDER);
@@ -171,7 +170,7 @@ public class Project {
     }
 
     static String[] getBootJars(Device device) {
-        String[] bcp = AdbUtilEx.getBootClassPath(device);
+        final String[] bcp = AdbUtilEx.getBootClassPath(device);
         for (int i = 0; i < bcp.length; i++) {
             bcp[i] = StringUtil.getOnlyFilename(bcp[i], '/');
         }
@@ -179,7 +178,7 @@ public class Project {
     }
 
     static String[] getServerJars(Device device) {
-        String[] scp = AdbUtilEx.getPathByEnv(device, "SYSTEMSERVERCLASSPATH");
+        final String[] scp = AdbUtilEx.getPathByEnv(device, "SYSTEMSERVERCLASSPATH");
         for (int i = 0; i < scp.length; i++) {
             scp[i] = StringUtil.getOnlyFilename(scp[i], '/');
         }
@@ -317,22 +316,22 @@ public class Project {
 
     public void makeJar(Collection<File> srcFiles) {
         DLog.i("Start makeJar.");
-        File dexFile = new File(folder, OUT_DEX_FILE);
+        final File dexFile = new File(folder, OUT_DEX_FILE);
         if (!dexFile.exists()) {
             DLog.i("makeJar: " + dexFile + " not found.");
             return;
         }
 
         try (DexDb db = new DexDb(dexJarsFolder.getAbsolutePath())) {
-            DexBackedDexFile df = DexUtilEx.loadDex(dexFile);
+            final DexBackedDexFile df = DexUtilEx.loadDex(dexFile);
             if (df == null) {
                 DLog.i("makeJar: unable to load " + dexFile);
                 return;
             }
-            DexReplacer.ReplaceInfo info = new DexReplacer.ReplaceInfo();
+            final DexReplacer.ReplaceInfo info = new DexReplacer.ReplaceInfo();
             boolean buildPartial = srcFiles != null;
             if (buildPartial) {
-                HashSet<String> existedJars = new HashSet<>();
+                final HashSet<String> existedJars = new HashSet<>();
                 int baseLen = new File(folder, DIR_SRC).getAbsolutePath().length() + 1;
                 for (File f : srcFiles) {
                     String type = f.getAbsolutePath();
@@ -340,7 +339,7 @@ public class Project {
                     if (Env.IS_WINDOWS) {
                         type = type.replace('\\', '/');
                     }
-                    String jar = db.findTargetJarForType("L" + type + ";");
+                    final String jar = db.findTargetJarForType("L" + type + ";");
                     if (jar == null) {
                         // TODO pop ui for editing files without target jar
                         DLog.i("makeJar: cannot find proper jar for " + f);
@@ -355,13 +354,13 @@ public class Project {
                             baseJar = FW_DEX_JARS_FOLDER + "/" + jar;
                         }
                     }
-                    String cmd = OUT_DEX_FILE + ":" + baseJar;
+                    final String cmd = OUT_DEX_FILE + ":" + baseJar;
                     info.addTarget(cmd, type);
                 }
             } else {
                 for (ClassDef cls : df.getClasses()) {
-                    String jar = db.findTargetJarForType(cls.getType());
-                    String cmd = OUT_DEX_FILE + ":" + FW_DEX_JARS_FOLDER + "/" + jar;
+                    final String jar = db.findTargetJarForType(cls.getType());
+                    final String cmd = OUT_DEX_FILE + ":" + FW_DEX_JARS_FOLDER + "/" + jar;
                     info.getTarget(cmd).add(DexUtilEx.classToSourceName(cls));
                 }
             }
@@ -425,7 +424,7 @@ public class Project {
 
         DLog.i("Preparing project at " + folder);
 
-        File buildXml = new File(folder, BUILD_XML);
+        final File buildXml = new File(folder, BUILD_XML);
         if (force || !buildXml.exists()) {
             try (DataInputStream dis = new DataInputStream(
                     Project.class.getResourceAsStream(BUILD_XML))) {
@@ -500,7 +499,7 @@ public class Project {
                 FileUtil.deleteFolder(libsFolder);
                 FileUtil.mkdirs(libsFolder);
             }
-            String libsPath = libsFolder.getAbsolutePath();
+            final String libsPath = libsFolder.getAbsolutePath();
             for (File d : FileUtil.listFiles(dexJarsFolder)) {
                 if (!d.getName().endsWith(".jar") || !DexUtilEx.containsDex(d)) {
                     continue;
@@ -517,7 +516,7 @@ public class Project {
         }
         writeClassPathProp(null, force);
 
-        String dexPath = dexJarsFolder.getAbsolutePath();
+        final String dexPath = dexJarsFolder.getAbsolutePath();
         if (DO_NOTHING_IF_EXISTS && DexDb.getDbFile(dexPath).exists()) {
             DLog.i("Skip existed DB");
         } else if (initDb) {
@@ -526,16 +525,16 @@ public class Project {
                 DLog.i("Creating class DB.");
 
                 // Boot classes first, by the order from device.
-                File[] bootDexFiles = new File[bcp.length];
-                HashSet<File> added = new HashSet<>();
+                final File[] bootDexFiles = new File[bcp.length];
+                final HashSet<File> added = new HashSet<>();
                 for (int i = 0; i < bootDexFiles.length; i++) {
                     bootDexFiles[i] = new File(dexJarsFolder, bcp[i]);
                     added.add(bootDexFiles[i]);
                 }
                 db.addClassesToDb(bootDexFiles);
 
-                HashSet<File> nonBoot = new HashSet<>();
-                nonBoot.addAll(Arrays.asList(FileUtil.getFiles(dexPath, ".jar")));
+                final HashSet<File> nonBoot = new HashSet<>(Arrays.asList(
+                        FileUtil.getFiles(dexPath, ".jar")));
                 nonBoot.removeAll(added);
                 db.addClassesToDb(nonBoot.toArray(bootDexFiles));
                 DLog.i("DB saved at " + db.getDbFile());
@@ -544,11 +543,11 @@ public class Project {
             }
         }
 
-        LinkedHashSet<String> allJars = new LinkedHashSet<>();
+        final LinkedHashSet<String> allJars = new LinkedHashSet<>();
         allJars.addAll(Arrays.asList(bcp));
         allJars.addAll(Arrays.asList(scp));
 
-        String[] libs = new String[allJars.size()];
+        final String[] libs = new String[allJars.size()];
         allJars.toArray(libs);
         int i = 0;
         for (String jar : allJars) {
@@ -563,7 +562,7 @@ public class Project {
         addStatus(STATUS_INITIALIZED);
     }
 
-    void prepareJackLibs() {
+    private void prepareJackLibs() {
         if (!useJack) {
             return;
         }
@@ -571,11 +570,12 @@ public class Project {
         if (jars.length > 0) {
             FileUtil.mkdirs(jacksFolder);
             String jacksPath = jacksFolder.getAbsolutePath();
-            if (apiLevel >= API_LEVEL_O) {
-                File hidlJar = new File(String.format(HIDL_PATH, apiLevel));
+            for (int apl = apiLevel; apl >= API_LEVEL_O; apl--) {
+                final File hidlJar = new File(String.format(HIDL_PATH, apl));
                 if (hidlJar.exists()) {
                     jars = Arrays.copyOf(jars, jars.length + 1);
                     jars[jars.length - 1] = hidlJar;
+                    break;
                 } else {
                     DLog.i("Hidl not found: " + hidlJar);
                 }
@@ -596,7 +596,7 @@ public class Project {
     }
 
     static String[] getLibs(String[] jars) {
-        String[] libs = new String[jars.length];
+        final String[] libs = new String[jars.length];
         for (int i = 0; i < jars.length; i++) {
             libs[i] = StringUtil.appendTail(jars[i], LIBS_POSTFIX);
         }
@@ -605,7 +605,7 @@ public class Project {
 
     // TODO Provide an UI to select lib manually and update to prop file, eclipse prj
     public void writeClassPathProp(String[] selectedLibs, boolean force) {
-        File propFile = new File(folder, PROP_FILE_CLASSPATH);
+        final File propFile = new File(folder, PROP_FILE_CLASSPATH);
         if (selectedLibs != null) {
             Properties prop = Env.loadProp(propFile);
             prop.put(PROP_LIBS, StringUtil.join(selectedLibs, ","));
@@ -664,7 +664,7 @@ public class Project {
 
     public static Collection<File> organizeSourceByPackage(
             File srcDir, Collection<File> srcFiles, boolean copy) {
-        ArrayList<File> moved = new ArrayList<>();
+        final ArrayList<File> moved = new ArrayList<>();
         for (File src : srcFiles) {
             String srcName = src.getName();
             if (!srcName.endsWith(".java") && !srcName.endsWith(".aidl")) {
@@ -729,11 +729,11 @@ public class Project {
         if (!isInitialized()) {
             initProject();
         }
-        ArrayList<File> fileList = new ArrayList<>();
+        final ArrayList<File> fileList = new ArrayList<>();
         for (File f : files) {
             toPlainList(f, fileList);
         }
-        Collection<File> srcFiles = organizeSourceByPackage(
+        final Collection<File> srcFiles = organizeSourceByPackage(
                 new File(folder, Project.DIR_SRC), fileList, true);
         if (build) {
             buildSourceAndMakeJar(srcFiles);

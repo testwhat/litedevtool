@@ -16,6 +16,7 @@
 
 package org.rh.ldt.ui;
 
+import org.jf.dexlib2.Opcode;
 import org.jf.dexlib2.iface.ClassDef;
 import org.rh.ldt.util.DexUtilEx;
 import org.rh.ldt.util.SmaliUtil;
@@ -137,7 +138,8 @@ class SmaliViewer extends JFrame {
 
         final ViewerPanel vp = new ViewerPanel(editorKit, null, cls.smaliContent);
         vp.setOnSaveAction(() -> {
-            ClassDef clsDef = SmaliUtil.assembleSmali(vp.getText());
+            ClassDef clsDef = SmaliUtil.assembleSmali(
+                    vp.getText(), cls.classDef.dexFile.getOpcodes().api);
             if (clsDef != null) {
                 DexUtilEx.SingleClassReplacer mdex;
                 if (dex.modifiedDex == null) {
@@ -173,11 +175,11 @@ class SmaliViewer extends JFrame {
         setVisible(true);
     }
 
-    public static class TabTitle extends JPanel {
+    static class TabTitle extends JPanel {
         JLabel titleLabel;
         JButton closeBtn;
 
-        public TabTitle(String title, Icon icon, Icon close, Icon closeOn) {
+        TabTitle(String title, Icon icon, Icon close, Icon closeOn) {
             super(new FlowLayout(FlowLayout.CENTER, 5, 0));
             setOpaque(false);
             titleLabel = new JLabel(title);
@@ -197,8 +199,8 @@ class SmaliViewer extends JFrame {
         }
     }
 
-    public static TabTitle addTab(final JTabbedPane tabbedPane, final JComponent content,
-            final String title, final Runnable onTabClose) {
+    private static TabTitle addTab(final JTabbedPane tabbedPane, final JComponent content,
+                                   final String title, final Runnable onTabClose) {
         tabbedPane.addTab(null, content);
         int pos = tabbedPane.indexOfComponent(content);
         TabTitle tabTitle = new TabTitle(title, TAB_ICON, CLOSE_TAB_ICON, CLOSE_TAB_ICON_R);
@@ -232,16 +234,22 @@ class SmaliViewer extends JFrame {
 class SmaliDocument extends DefaultStyledDocument {
 
     private static final HashMap<String, MutableAttributeSet> keywords;
-    static final SimpleAttributeSet STYLE_DEFAULT;
-    static final SimpleAttributeSet STYLE_COMMENT;
-    static final SimpleAttributeSet STYLE_STRING;
-    Element rootElement;
+    private static final SimpleAttributeSet STYLE_DEFAULT;
+    private static final SimpleAttributeSet STYLE_COMMENT;
+    private static final SimpleAttributeSet STYLE_STRING;
+    private Element rootElement;
 
     static {
         keywords = new HashMap<>();
-        String[] kw = ".method .annotation .end .line .prologue .implements .super .class .source .locals .parameter .field .local .restart".split(" ");
+        String[] kw = (".method .annotation .end .line .prologue .implements .super .class .source "
+                + ".locals .parameter .field .local .restart").split(" ");
         initStyle(kw, new Color(30, 60, 190));
-        String[] instr = "move move/from16 move/16 move-wide move-wide/from16 move-wide/16 move-object move-object/from16 move-object/16 move-result move-result-wide move-result-object move-exception return-void return return-wide return-object const/4 const/16 const const/high16 const-wide/16 const-wide/32 const-wide const-wide/high16 const-string const-string/jumbo const-class monitor-enter monitor-exit check-cast instance-of array-length new-instance new-array filled-new-array filled-new-array/range fill-array-data throw goto goto/16 goto/32 packed-switch sparse-switch cmpl-float cmpg-float cmpl-double cmpg-double cmp-long if-eq if-ne if-lt if-ge if-gt if-le if-eqz if-nez if-ltz if-gez if-gtz if-lez aget aget-wide aget-object aget-boolean aget-byte aget-char aget-short aget-short aput aput-wide aput-object aput-boolean aput-byte aput-char aput-short iget iget-wide iget-object iget-boolean iget-char iget-short iput iput-wide iput-object iput-boolean iput-byte iput-char iput-short sget sget-wide sgetobject sget-boolean sget-byte sget-char sget-short sput sput-wide sput-object sput-boolean sput-byte sput-char sput-short invoke-virtual invoke-super invoke-direct invoke-static invoke-interface invoke-virtual/range invoke-super/range invoke-direct/range invoke-static/range invoke-interface/range neg-int not-int neg-long neg-float neg-double int-tolong int-tofloat int-to-double long-to-int long-to-float long-to-double float-to-int float-to-long double-to-double double-to-int double-to-long double-to-float int-to-byte int-to-char int-to-short add-int sub-int mul-int div-int rem-int and-int or-int xor-int shl-int shr-int ushr-int add-long sub-long mul-long div-long rem-long and-long or-long xor-long shl-long shr-long ushr-long add-float sub-float mul-float div-float rem-float add-double sub-double mul-double div-double rem-double add-int/2addr sub-int/2addr mul-int/2addr div-int/2addr rem-int/2addr and-int/2addr or-int/2addr xor-int/2addr shl-int/2addr shr-int/2addr usnhr-int/2addr add-long/2addr sub-long/2addr mul-long/2addr div-long/2addr rem-long/2addr and-long/2addr or-long/2addr xor-long/2addr shl-long/2addr shr-long/2addr ushr-long/2addr add-float/2addr sub-float/2addr mul-float/2addr div-float/2addr rem-float/2addr add-double/2addr mul-double/2addr div-double/2addr rem-double/2addr add-int/lit16 rsub-int mul-int/lit16 div-int/lit16 and-int.lit16 or-int/lit16 xor-int/lit16 and-int/lit8 mul-int/lit8 div-int/lit8".split(" ");
+        Opcode[] opcodes = Opcode.values();
+        String[] instr = new String[opcodes.length];
+        for (int i = 0; i < opcodes.length; i++) {
+            instr[i] = opcodes[i].name;
+        }
+
         initStyle(instr, new Color(140, 110, 40));
         String[] acc = "public annotation method protected static final field private synthetic local".split(" ");
         initStyle(acc, new Color(90, 20, 120));
@@ -265,7 +273,7 @@ class SmaliDocument extends DefaultStyledDocument {
 		}
     }
 
-    public SmaliDocument() {
+    SmaliDocument() {
         rootElement = getDefaultRootElement();
         putProperty(javax.swing.text.DefaultEditorKit.EndOfLineStringProperty, "\n");
     }
@@ -304,7 +312,7 @@ class SmaliDocument extends DefaultStyledDocument {
 //        }
     }
 
-    private void execHighlightInner(String content, int line) throws BadLocationException {
+    private void execHighlightInner(String content, int line) {
         int startOffset = rootElement.getElement(line).getStartOffset();
         int endOffset = rootElement.getElement(line).getEndOffset() - 1;
         int contentLength = content.length();
@@ -391,12 +399,12 @@ class SmaliDocument extends DefaultStyledDocument {
         return endOfToken + 1;
     }
 
-    protected static boolean isDelimiter(String character) {
+    private static boolean isDelimiter(String character) {
         String operands = ";:{}()[]+-/%<=>!&|^~*";
         return Character.isWhitespace(character.charAt(0)) || operands.contains(character);
     }
 
-    protected static boolean isQuoteDelimiter(String character) {
+    private static boolean isQuoteDelimiter(String character) {
         return "\"'".contains(character);
     }
 }
@@ -410,7 +418,7 @@ class TabTransferable implements Transferable {
             DataFlavor.javaJVMLocalObjectMimeType, NAME);
     private final Component tabbedPane;
 
-    public TabTransferable(Component tabbedPane) {
+    TabTransferable(Component tabbedPane) {
         this.tabbedPane = tabbedPane;
     }
 
@@ -479,7 +487,7 @@ class DnDTabbedPane extends JTabbedPane {
         }
     }
 
-    public DnDTabbedPane() {
+    DnDTabbedPane() {
         mGlassPane = new GhostGlassPane();
         mGlassPane.setName("GlassPane");
         initDrop();
@@ -715,7 +723,7 @@ class DnDTabbedPane extends JTabbedPane {
             try {
                 image = image.getSubimage(rect.x, rect.y, rect.width, rect.height);
                 mGlassPane.setImage(image);
-            } catch (Exception e) {
+            } catch (Exception ignored) {
             }
         }
         Point glassPt = SwingUtilities.convertPoint(c, tabPt, mGlassPane);
@@ -752,7 +760,7 @@ class DnDTabbedPane extends JTabbedPane {
         private Point mLocation = new Point(0, 0);
         private BufferedImage mDraggingGhost;
 
-        public GhostGlassPane() {
+        GhostGlassPane() {
             super();
             setOpaque(false);
             mComposite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f);

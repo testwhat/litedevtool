@@ -55,11 +55,6 @@ import java.util.zip.ZipFile;
 public class DexUtilEx extends DexUtil {
 
     @Nonnull
-    public static Opcodes getDefaultOpCodes() {
-        return getDefaultOpCodes(null);
-    }
-
-    @Nonnull
     public static List<DexBackedDexFile> loadMultiDex(@Nonnull File f) {
         return DexUtil.loadMultiDex(f, null);
     }
@@ -92,9 +87,9 @@ public class DexUtilEx extends DexUtil {
         if (sb.length() > 1) {
             sb.setLength(sb.length() - 2);
         }
-        String paramStr = sb.toString();
+        final String paramStr = sb.toString();
         sb.setLength(0);
-        String accStr = AccessFlags.formatAccessFlagsForMethod(m.getAccessFlags());
+        final String accStr = AccessFlags.formatAccessFlagsForMethod(m.getAccessFlags());
         return sb.append(accStr).append((accStr.length() > 0 ? " " : ""))
                 .append(toReadableType(m.getReturnType())).append(" ").append(m.getName())
                 .append("(").append(paramStr).append(")").toString();
@@ -113,8 +108,8 @@ public class DexUtilEx extends DexUtil {
                 && m1.getReturnType().equals(m2.getReturnType())
                 && m1.getAccessFlags() == m2.getAccessFlags()
                 && m1.getDefiningClass().equals(m2.getDefiningClass())) {
-            Iterator<? extends MethodParameter> p1i = m1.getParameters().iterator();
-            Iterator<? extends MethodParameter> p2i = m2.getParameters().iterator();
+            final Iterator<? extends MethodParameter> p1i = m1.getParameters().iterator();
+            final Iterator<? extends MethodParameter> p2i = m2.getParameters().iterator();
             while (p1i.hasNext()) {
                 MethodParameter p1 = p1i.next();
                 if (p2i.hasNext()) {
@@ -143,10 +138,10 @@ public class DexUtilEx extends DexUtil {
 
     public static boolean containsDex(@Nonnull File file) {
         try (ZipFile zipFile = new ZipFile(file)) {
-            Enumeration<? extends ZipEntry> zs = zipFile.entries();
+            final Enumeration<? extends ZipEntry> zs = zipFile.entries();
             while (zs.hasMoreElements()) {
-                ZipEntry entry = zs.nextElement();
-                String name = entry.getName();
+                final ZipEntry entry = zs.nextElement();
+                final String name = entry.getName();
                 if (name.startsWith("classes") && name.endsWith(".dex")) {
                     return true;
                 }
@@ -261,7 +256,7 @@ public class DexUtilEx extends DexUtil {
 
     @Nonnull
     public static String rawTypeToPackagePath(@Nonnull String type) {
-        int lastSlash = type.lastIndexOf('/') + 1;
+        final int lastSlash = type.lastIndexOf('/') + 1;
         if (lastSlash > 0) {
             return type.substring(1, lastSlash);
         }
@@ -270,8 +265,8 @@ public class DexUtilEx extends DexUtil {
 
     @Nonnull
     public static String simpleName(@Nonnull ClassDef c) {
-        String type = c.getType();
-        int lastSlash = type.lastIndexOf('/') + 1;
+        final String type = c.getType();
+        final int lastSlash = type.lastIndexOf('/') + 1;
         if (lastSlash > 0) {
             return type.substring(lastSlash, type.length() - 1);
         }
@@ -279,8 +274,8 @@ public class DexUtilEx extends DexUtil {
     }
 
     public static void createDexJar(@Nonnull String[] files, @Nonnull String output) {
-        Manifest manifest = new Manifest();
-        Attributes attribute = manifest.getMainAttributes();
+        final Manifest manifest = new Manifest();
+        final Attributes attribute = manifest.getMainAttributes();
         attribute.putValue("Manifest-Version", "1.0");
 
         final byte[] buf = new byte[8192];
@@ -292,9 +287,9 @@ public class DexUtilEx extends DexUtil {
                 try (FileInputStream in = new FileInputStream(file)) {
                     String filename = file.replace('\\', '/');
                     filename = filename.substring(filename.lastIndexOf('/') + 1);
-                    if (filename.endsWith(".dex")) {
+                    if (filename.endsWith(".dex") && !filename.startsWith("classes")) {
                         jos.putNextEntry(new ZipEntry(
-                                i > 0 ? "classes.dex" : "classes" + idx + ".dex"));
+                                i == 1 ? "classes.dex" : "classes" + idx + ".dex"));
                         idx = String.valueOf(++i);
                     } else {
                         jos.putNextEntry(new ZipEntry(filename));

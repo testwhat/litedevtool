@@ -20,6 +20,8 @@ import java.awt.AWTEvent;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.EventQueue;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.GridBagLayout;
 import java.awt.LayoutManager;
 import java.awt.Point;
@@ -405,18 +407,28 @@ class Toast extends JDialog {
     public static final int LENGTH_SHORT = 3000;
     public static final int LENGTH_LONG = 6000;
 
-    private final float MAX_OPACITY = 0.8f;
-    private final float OPACITY_INCREMENT = 0.05f;
-    private final int FADE_REFRESH_RATE = 20;
-    private final int WINDOW_RADIUS = 15;
-    private final int CHARACTER_LENGTH_MULTIPLIER = 7;
-    private final int DISTANCE_FROM_PARENT_TOP = 100;
+    private static final float MAX_OPACITY = 0.8f;
+    private static final float OPACITY_INCREMENT = 0.05f;
+    private static final int FADE_REFRESH_RATE = 20;
+    private static final int WINDOW_RADIUS = 15;
+    private static final int CHARACTER_LENGTH_MULTIPLIER = 7;
+    private static final int DISTANCE_FROM_PARENT_TOP = 100;
+    private static final boolean SUPPORTS_TRANSLUCENCY;
 
     private final JFrame mOwner;
     private String mText;
     private int mDuration;
     private Color mBackgroundColor = Color.BLACK;
     private Color mForegroundColor = Color.WHITE;
+
+    static {
+        GraphicsEnvironment ge = GraphicsEnvironment
+                .getLocalGraphicsEnvironment();
+        GraphicsDevice gd = ge.getDefaultScreenDevice();
+
+        SUPPORTS_TRANSLUCENCY = gd.isWindowTranslucencySupported(
+                GraphicsDevice.WindowTranslucency.TRANSLUCENT);
+    }
 
     public Toast(JFrame owner) {
         super(owner);
@@ -445,6 +457,13 @@ class Toast extends JDialog {
         add(label);
     }
 
+    @Override
+    public void setOpacity(float val) {
+        if (SUPPORTS_TRANSLUCENCY) {
+            super.setOpacity(val);
+        }
+    }
+
     public void fadeIn() {
         final Timer timer = new Timer(FADE_REFRESH_RATE, null);
         timer.setRepeats(true);
@@ -464,7 +483,10 @@ class Toast extends JDialog {
         setOpacity(0);
         timer.start();
 
-        setLocation(getToastLocation());
+        final Point ownerLoc = mOwner.getLocation();
+        final int x = (int) (ownerLoc.getX() + ((mOwner.getWidth() - getWidth()) / 2));
+        final int y = (int) (ownerLoc.getY() + DISTANCE_FROM_PARENT_TOP);
+        setLocation(new Point(x, y));
         setVisible(true);
     }
 
@@ -488,13 +510,6 @@ class Toast extends JDialog {
 
         setOpacity(MAX_OPACITY);
         timer.start();
-    }
-
-    private Point getToastLocation() {
-        Point ownerLoc = mOwner.getLocation();
-        int x = (int) (ownerLoc.getX() + ((mOwner.getWidth() - this.getWidth()) / 2));
-        int y = (int) (ownerLoc.getY() + DISTANCE_FROM_PARENT_TOP);
-        return new Point(x, y);
     }
 
     public void setText(String text) {

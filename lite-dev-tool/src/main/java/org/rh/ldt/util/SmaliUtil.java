@@ -28,6 +28,7 @@ import org.jf.baksmali.BaksmaliOptions;
 import org.jf.dexlib2.Opcodes;
 import org.jf.dexlib2.VersionMap;
 import org.jf.dexlib2.analysis.ClassPath;
+import org.jf.dexlib2.dexbacked.DexBackedClassDef;
 import org.jf.dexlib2.dexbacked.DexBackedDexFile;
 import org.jf.dexlib2.iface.ClassDef;
 import org.jf.dexlib2.iface.DexFile;
@@ -50,6 +51,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,66 +65,65 @@ public class SmaliUtil {
 
     // Output to xxx_dexjar
     public static void smali(File f) {
-        long s = System.currentTimeMillis();
+        final long s = System.currentTimeMillis();
         String fn = f.getName();
         if (fn.endsWith("_smali")) {
             fn = fn.substring(0, fn.length() - 6);
         }
-        String outputFolder = f.getParent() + "/" + fn + "_dexjar";
-        String outDex = outputFolder + "/classes.dex";
+        final String outputFolder = f.getParent() + "/" + fn + "_dexjar";
+        final String outDex = outputFolder + "/classes.dex";
         MiscUtil.mkdirs(new File(outputFolder));
-        String cmd = "a " + f.getAbsolutePath() + " -o " + outDex;
+        final String cmd = "a " + f.getAbsolutePath() + " -o " + outDex;
         System.out.println("smali " + cmd.replace("\\", "/"));
         org.jf.smali.Main.main(cmd.split(" "));
-        String outJar = outputFolder + "/" + fn + ".jar";
-        // TODO multi-dex
-        DexUtilEx.createDexJar(new String[]{outDex}, outJar);
+
+        final String outJar = outputFolder + "/" + fn + ".jar";
+        final String[] outDexFiles = Arrays.stream(FileUtil.getFiles(outputFolder, ".dex")).map(
+                File::getAbsolutePath).toArray(String[]::new);
+        if (outDexFiles.length == 0) {
+            System.out.println("Assembly failed");
+            return;
+        }
+        DexUtilEx.createDexJar(outDexFiles, outJar);
         System.out.println("Output jar: " + outJar.replace("\\", "/"));
         System.out.println("smali complete, " + (System.currentTimeMillis() - s) + "ms\n");
     }
 
     // Output to xxx_smali
     public static void baksmali(File f) {
-        long s = System.currentTimeMillis();
+        final long s = System.currentTimeMillis();
         String fn = f.getName();
         int dotPos = fn.lastIndexOf('.');
         if (dotPos > 0) {
             fn = fn.substring(0, dotPos);
         }
-        String outputFolder = f.getParent() + "/" + fn + "_smali";
-        String cmd = "d " + f.getAbsolutePath() + " -o " + outputFolder;
+        final String outputFolder = f.getParent() + "/" + fn + "_smali";
+        final String cmd = "d " + f.getAbsolutePath() + " -o " + outputFolder;
         System.out.println("baksmali " + cmd.replace("\\", "/"));
         try {
             org.jf.baksmali.Main.main(cmd.split(" "));
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        System.out.println("Ouput folder: " + outputFolder.replace("\\", "/"));
+        System.out.println("Output folder: " + outputFolder.replace("\\", "/"));
         System.out.println("baksmali complete, " + (System.currentTimeMillis() - s) + "ms\n");
     }
 
     public static String getSmaliContent(ClassDef classDef) {
-//        return getSmaliContent(classDef, (ClassPath) null);
-        BaksmaliOptions options = new BaksmaliOptions();
-        options.apiLevel = DexUtil.DEFAULT_API_LEVEL;
+        final BaksmaliOptions options = new BaksmaliOptions();
+        options.apiLevel = classDef instanceof DexBackedClassDef
+                ? ((DexBackedClassDef) classDef).dexFile.getOpcodes().api
+                : DexUtil.getDefaultOpCodes().api;
         options.accessorComments = false;
-        ClassDefinition cd = new ClassDefinition(options, classDef);
-        StringWriter sw = new StringWriter(1024);
-        try {
-            IndentingWriter writer = new IndentingWriter(sw);
-            cd.writeTo(writer);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-        return sw.toString();
+        return getSmaliContent(classDef, options);
     }
 
-    public static String getSmaliContent(ClassDef classDef, ClassPath classPath) {
-        BaksmaliOptions options = new BaksmaliOptions();
+    public static String getOdexSmaliContent(ClassDef classDef, ClassPath classPath) {
+        final BaksmaliOptions options = new BaksmaliOptions();
         if (classPath != null) {
             options.apiLevel = classPath.isArt()
-                    ? VersionMap.mapApiToArtVersion(classPath.oatVersion)
-                    : DexUtil.DEFAULT_API_LEVEL;
+                    ? VersionMap.mapArtVersionToApi(classPath.oatVersion)
+                    : DexUtil.getDefaultOpCodes().api;
             options.allowOdex = true;
             options.deodex = true;
             options.classPath = classPath;
@@ -132,8 +133,8 @@ public class SmaliUtil {
     }
 
     public static String getSmaliContent(ClassDef classDef, BaksmaliOptions options) {
-        ClassDefinition cd = new ClassDefinition(options, classDef);
-        StringWriter sw = new StringWriter(4096);
+        final ClassDefinition cd = new ClassDefinition(options, classDef);
+        final StringWriter sw = new StringWriter(4096);
         try {
             IndentingWriter writer = new IndentingWriter(sw);
             cd.writeTo(writer);
@@ -144,24 +145,24 @@ public class SmaliUtil {
     }
 
     @Nullable
-    public static ClassDef assembleSmali(String smaliContent) {
+    public static ClassDef assembleSmali(String smaliContent, int apiLevel) {
         try {
-            final DexBuilder dexBuilder = new DexBuilder(DexUtilEx.getDefaultOpCodes());
-            LexerErrorInterface lexer = new smaliFlexLexer(new StringReader(smaliContent));
-            CommonTokenStream tokens = new CommonTokenStream((TokenSource) lexer);
-            smaliParser parser = new smaliParser(tokens);
-            //parser.setApiLevel(DexUtil.API_LEVEL);
+            final DexBuilder dexBuilder = new DexBuilder(DexUtilEx.getOpcodes(apiLevel));
+            final LexerErrorInterface lexer = new smaliFlexLexer(new StringReader(smaliContent));
+            final CommonTokenStream tokens = new CommonTokenStream((TokenSource) lexer);
+            final smaliParser parser = new smaliParser(tokens);
+            parser.setApiLevel(apiLevel);
             smaliParser.smali_file_return result = parser.smali_file();
 
             if (parser.getNumberOfSyntaxErrors() > 0 || lexer.getNumberOfSyntaxErrors() > 0) {
                 return null;
             }
 
-            CommonTree t = result.getTree();
-            CommonTreeNodeStream treeStream = new CommonTreeNodeStream(t);
+            final CommonTree t = result.getTree();
+            final CommonTreeNodeStream treeStream = new CommonTreeNodeStream(t);
             treeStream.setTokenStream(tokens);
 
-            smaliTreeWalker dexGen = new smaliTreeWalker(treeStream);
+            final smaliTreeWalker dexGen = new smaliTreeWalker(treeStream);
             dexGen.setDexBuilder(dexBuilder);
             return dexGen.smali_file();
         } catch (RecognitionException ex) {
@@ -171,11 +172,11 @@ public class SmaliUtil {
     }
 
     public static void baksmali(String inputDexFile, String outputDirectory) {
-        BaksmaliOptions options = new BaksmaliOptions();
+        final BaksmaliOptions options = new BaksmaliOptions();
 
-        File dexFile = new File(inputDexFile);
+        final File dexFile = new File(inputDexFile);
         File outputDir = new File(outputDirectory);
-        List<DexBackedDexFile> dexFiles = DexUtilEx.loadMultiDex(dexFile);
+        final List<DexBackedDexFile> dexFiles = DexUtilEx.loadMultiDex(dexFile);
         int index = 1;
         for (DexBackedDexFile dex : dexFiles) {
             org.jf.baksmali.Baksmali.disassembleDexFile(dex, outputDir, 4, options);
@@ -183,19 +184,15 @@ public class SmaliUtil {
         }
     }
 
-    public static void assembleSmaliFile(String smaliFolder) {
-        assembleSmaliFile(smaliFolder, DexUtil.DEFAULT_API_LEVEL,
+    public static void assembleSmaliFile(String smaliFolder, final int apiLevel) {
+        final ExecutorService executor = Executors.newFixedThreadPool(
                 Runtime.getRuntime().availableProcessors());
-    }
-
-    public static void assembleSmaliFile(String smaliFolder, final int apiLevel, final int jobs) {
-        ExecutorService executor = Executors.newFixedThreadPool(jobs);
         long s = System.currentTimeMillis();
         final DexBuilder dexBuilder = new DexBuilder(Opcodes.forApi(apiLevel));
-        LinkedHashSet<File> filesToProcess = new LinkedHashSet<>();
+        final LinkedHashSet<File> filesToProcess = new LinkedHashSet<>();
         getSmaliFilesInDir(new File(smaliFolder), filesToProcess);
 
-        List<Future<Boolean>> tasks = Lists.newArrayList();
+        final List<Future<Boolean>> tasks = Lists.newArrayList();
         for (final File file : filesToProcess) {
             tasks.add(executor.submit(() -> assembleSmaliFile(file, dexBuilder, apiLevel)));
         }
@@ -217,7 +214,7 @@ public class SmaliUtil {
         }
         executor.shutdown();
 
-        String outputDexFile = smaliFolder + ".dex";
+        final String outputDexFile = smaliFolder + ".dex";
         try {
             dexBuilder.writeTo(new FileDataStore(new File(outputDexFile)));
         } catch (IOException ex) {
@@ -229,12 +226,12 @@ public class SmaliUtil {
     private static boolean assembleSmaliFile(File smaliFile, DexBuilder dexBuilder, int apiLevel)
             throws Exception {
 
-        FileInputStream fis = new FileInputStream(smaliFile.getAbsolutePath());
+        final FileInputStream fis = new FileInputStream(smaliFile.getAbsolutePath());
         try (InputStreamReader reader = new InputStreamReader(fis, "UTF-8")) {
-            LexerErrorInterface lexer = new smaliFlexLexer(reader);
+            final LexerErrorInterface lexer = new smaliFlexLexer(reader);
             ((smaliFlexLexer) lexer).setSourceFile(smaliFile);
-            CommonTokenStream tokens = new CommonTokenStream((TokenSource) lexer);
-            smaliParser parser = new smaliParser(tokens);
+            final CommonTokenStream tokens = new CommonTokenStream((TokenSource) lexer);
+            final smaliParser parser = new smaliParser(tokens);
             parser.setApiLevel(apiLevel);
             smaliParser.smali_file_return result = parser.smali_file();
 
@@ -242,11 +239,11 @@ public class SmaliUtil {
                 return false;
             }
 
-            CommonTree t = result.getTree();
-            CommonTreeNodeStream treeStream = new CommonTreeNodeStream(t);
+            final CommonTree t = result.getTree();
+            final CommonTreeNodeStream treeStream = new CommonTreeNodeStream(t);
             treeStream.setTokenStream(tokens);
 
-            smaliTreeWalker dexGen = new smaliTreeWalker(treeStream);
+            final smaliTreeWalker dexGen = new smaliTreeWalker(treeStream);
             dexGen.setDexBuilder(dexBuilder);
             dexGen.smali_file();
             return dexGen.getNumberOfSyntaxErrors() == 0;
@@ -266,7 +263,7 @@ public class SmaliUtil {
     public static DexFile forceOdex2dex(final DexFile d, ClassPath classPath) {
         //classPath.oatVersion
         Opcodes.forArtVersion(classPath.oatVersion);
-        BaksmaliOptions options = new BaksmaliOptions();
+        final BaksmaliOptions options = new BaksmaliOptions();
         options.classPath = classPath;
         options.apiLevel = d.getOpcodes().api;
         options.allowOdex = true;
@@ -275,9 +272,10 @@ public class SmaliUtil {
         final HashSet<ClassDef> out = new HashSet<>();
         for (ClassDef c : d.getClasses()) {
             String s = SmaliUtil.getSmaliContent(c, options);
-            out.add(SmaliUtil.assembleSmali(s));
+            out.add(SmaliUtil.assembleSmali(s, options.apiLevel));
         }
         return new DexFile() {
+            @Nonnull
             @Override
             public Set<? extends ClassDef> getClasses() {
                 return out;

@@ -302,6 +302,8 @@ public class MainUi extends JFrame {
 
     private static void initUIStyle() {
         try {
+            System.setProperty("awt.useSystemAAFontSettings","on");
+            System.setProperty("swing.aatext", "true");
             //UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel");
             UIDefaults defaults = UIManager.getLookAndFeelDefaults();

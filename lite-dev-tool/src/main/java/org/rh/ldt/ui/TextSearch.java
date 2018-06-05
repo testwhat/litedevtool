@@ -60,10 +60,10 @@ public class TextSearch {
         mSearchPainter.hColor = c;
     }
 
-    public static class ColorHighlightPainter extends DefaultHighlighter.DefaultHighlightPainter {
+    static class ColorHighlightPainter extends DefaultHighlighter.DefaultHighlightPainter {
         private Color hColor;
 
-        public ColorHighlightPainter(Color c) {
+        ColorHighlightPainter(Color c) {
             super(null);
             hColor = c;
         }
@@ -155,19 +155,19 @@ public class TextSearch {
         }
     }
 
-    public static class SearchParam {
+    static class SearchParam {
         String searchString;
         boolean ignoreCase = true;
         boolean fullString;// = true;
-        public SearchParam(String str) {
+        SearchParam(String str) {
             searchString = str;
         }
     }
 
-    public static class ResultIndexes {
-        public final IntArray dataOffsets;
-        public final IntArray lineIndexes;
-        public ResultIndexes(IntArray d, IntArray l) {
+    static class ResultIndexes {
+        final IntArray dataOffsets;
+        final IntArray lineIndexes;
+        ResultIndexes(IntArray d, IntArray l) {
             dataOffsets = d;
             lineIndexes = l;
         }
@@ -178,7 +178,7 @@ public class TextSearch {
         private final Document document;
         SearchParam param;
 
-        public Search(Document d, SearchParam s) {
+        Search(Document d, SearchParam s) {
             document = d;
             param = s;
         }
